@@ -39,7 +39,7 @@ class GameConfig:
     # Paddle Configuration
     PADDLE_WIDTH: int = 10
     PADDLE_HEIGHT: int = 80
-    PADDLE_SPEED: int = 6
+    PADDLE_SPEED: int = 10
     LEFT_PADDLE_X: int = 30
     RIGHT_PADDLE_X: int = WINDOW_WIDTH - 40
     
@@ -374,17 +374,40 @@ class PingPongGame:
         self.ball.x += self.ball_speed_x
         self.ball.y += self.ball_speed_y
         
-        # Boundary collision (top/bottom)
-        if self.ball.top <= 0 or self.ball.bottom >= GameConfig.WINDOW_HEIGHT:
-            self.ball_speed_y *= -1
+        # Clamp ball speed to maximum for stability
+        speed_magnitude = (self.ball_speed_x ** 2 + self.ball_speed_y ** 2) ** 0.5
+        if speed_magnitude > GameConfig.MAX_BALL_SPEED:
+            scale = GameConfig.MAX_BALL_SPEED / speed_magnitude
+            self.ball_speed_x *= scale
+            self.ball_speed_y *= scale
         
-        # Paddle collisions and rally tracking
-        if self.ball.colliderect(self.left_paddle) and self.ball_speed_x < 0:
-            self.ball_speed_x *= -1
+        # Boundary collision (top/bottom) with proper clamping
+        if self.ball.top <= 0:
+            self.ball.top = 0
+            self.ball_speed_y = abs(self.ball_speed_y)  # Ensure moving downward
+        elif self.ball.bottom >= GameConfig.WINDOW_HEIGHT:
+            self.ball.bottom = GameConfig.WINDOW_HEIGHT
+            self.ball_speed_y = -abs(self.ball_speed_y)  # Ensure moving upward
+        
+        # Paddle collisions with improved detection
+        left_collision = self.ball.colliderect(self.left_paddle) and self.ball_speed_x < 0
+        if left_collision:
+            # Ensure ball is pushed out of paddle
+            self.ball.left = self.left_paddle.right
+            self.ball_speed_x = abs(self.ball_speed_x)  # Ensure moving right
+            # Add spin based on where ball hit paddle
+            hit_pos = (self.ball.y - self.left_paddle.y) / self.left_paddle.height
+            self.ball_speed_y += (hit_pos - 0.5) * 2
             self.rally_count += 1
         
-        if self.ball.colliderect(self.right_paddle) and self.ball_speed_x > 0:
-            self.ball_speed_x *= -1
+        right_collision = self.ball.colliderect(self.right_paddle) and self.ball_speed_x > 0
+        if right_collision:
+            # Ensure ball is pushed out of paddle
+            self.ball.right = self.right_paddle.left
+            self.ball_speed_x = -abs(self.ball_speed_x)  # Ensure moving left
+            # Add spin based on where ball hit paddle
+            hit_pos = (self.ball.y - self.right_paddle.y) / self.right_paddle.height
+            self.ball_speed_y += (hit_pos - 0.5) * 2
             self.rally_count += 1
         
         # Power-up collision detection
